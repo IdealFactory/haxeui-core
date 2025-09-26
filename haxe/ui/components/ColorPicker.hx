@@ -168,7 +168,9 @@ private class HSVColorPickerImpl extends ColorPickerImpl {
     
     private override function set_currentColor(value:Null<Color>):Null<Color> {
         _currentColorHSV = ColorUtil.toHSV(value);
-        _currentColorRGBF = {r:value.r, g:value.g, b:value.b};
+        _currentColorRGBF = {r: (value.toInt() >> 16) & 0xFF, g: (value.toInt() >> 8) & 0xFF, b: value.toInt() & 0xFF};
+
+//        _currentColorRGBF = ColorUtil.hsvToRGBF(_currentColorHSV.h, _currentColorHSV.s, _currentColorHSV.v);
         return super.set_currentColor(value);
     }
 
@@ -580,7 +582,7 @@ private class HSVColorPickerImpl extends ColorPickerImpl {
         _currentColorRGBF = newRGBF;
         onCurrentColorChanged();
     }
-    
+
     private var _trackingSaturationValue:Bool = false;
     @:bind(saturationValueGraph, MouseEvent.MOUSE_DOWN)
     private function onSaturationValueGraphDown(e:MouseEvent) {
@@ -589,8 +591,8 @@ private class HSVColorPickerImpl extends ColorPickerImpl {
         
         Screen.instance.registerEvent(MouseEvent.MOUSE_MOVE, onScreenMouseMove);
         Screen.instance.registerEvent(MouseEvent.MOUSE_UP, onScreenMouseUp);
-        
-        applyHSVFromCoord(e.screenX - (saturationValueGraph.screenLeft + getComponentOffset().x), e.screenY - (saturationValueGraph.screenTop + getComponentOffset().y));
+
+        applyHSVFromCoord(e.screenX - saturationValueGraph.screenLeft - this.getComponentOffset().x, e.screenY - saturationValueGraph.screenTop - this.getComponentOffset().y);
     }
 
     private var _trackingHue:Bool = false;
@@ -602,14 +604,14 @@ private class HSVColorPickerImpl extends ColorPickerImpl {
         Screen.instance.registerEvent(MouseEvent.MOUSE_MOVE, onScreenMouseMove);
         Screen.instance.registerEvent(MouseEvent.MOUSE_UP, onScreenMouseUp);
         
-        applyHueFromCoord(e.screenX - (hueGraph.screenLeft + getComponentOffset().x), e.screenY - (hueGraph.screenTop + getComponentOffset().y));
+        applyHueFromCoord(e.screenX - hueGraph.screenLeft - this.getComponentOffset().x, e.screenY - hueGraph.screenTop - this.getComponentOffset().y);
     }
     
     private function onScreenMouseMove(e:MouseEvent) {
         if (_trackingSaturationValue) {
-            applyHSVFromCoord(e.screenX - (saturationValueGraph.screenLeft + getComponentOffset().x), e.screenY - (saturationValueGraph.screenTop + getComponentOffset().y));
+            applyHSVFromCoord(e.screenX - saturationValueGraph.screenLeft - this.getComponentOffset().x, e.screenY - saturationValueGraph.screenTop - this.getComponentOffset().y);
         } else if (_trackingHue) {
-            applyHueFromCoord(e.screenX - (hueGraph.screenLeft + getComponentOffset().x), e.screenY - (hueGraph.screenTop + getComponentOffset().y));
+            applyHueFromCoord(e.screenX - hueGraph.screenLeft - this.getComponentOffset().x, e.screenY - hueGraph.screenTop - this.getComponentOffset().y);
         }
     }
     
