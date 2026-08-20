@@ -151,7 +151,7 @@ class ButtonLayout extends DefaultLayout {
         super.resizeChildren();
 
         if (_component.autoWidth == false) {
-            var label:Label = component.findComponent(Label, false);
+            var label:Label = component.findComponent("button-label", Label, false, "id");
             var ucx = usableSize.width;
             if (label != null) {
                 //  label mustn't be bigger than usable size
@@ -173,7 +173,7 @@ class ButtonLayout extends DefaultLayout {
         }
 
         if (_component.autoHeight == false) {
-            var icon:Image = component.findComponent("button-icon", false);
+            var icon:Component = component.findComponent("button-icon", false);
             if (icon != null && icon.hidden) {
                 icon = null;
             }
@@ -191,7 +191,7 @@ class ButtonLayout extends DefaultLayout {
 
     private override function get_usableSize():Size {
         var size = super.get_usableSize();
-        var icon:Image = component.findComponent("button-icon", false);
+        var icon:Component = component.findComponent("button-icon", false);
         if (icon != null && icon.hidden) {
             icon = null;
         }
@@ -209,40 +209,45 @@ class ButtonLayout extends DefaultLayout {
     public override function calcAutoSize(exclusions:Array<Component> = null):Size {
         var exclusions:Array<Component> = [];
         var itemRenderer = component.findComponent(ItemRenderer);
-        var icon:Image = component.findComponent("button-icon", false);
+        var icon:Component = component.findComponent("button-icon", false);
         if (icon != null && icon.hidden) {
             icon = null;
         }
-        if (itemRenderer != null && isIconRelevant()) {
+        var label:Label = component.findComponent("button-label", Label, false, "id");
+        var textAlign = cast(component, Button).textAlign;
+        var besideCentredText = itemRenderer == null && label != null && textAlign == "center"
+            && (iconPosition == "center-right" || iconPosition == "center-left");
+
+        // Held out of the measurement below wherever its width is added by hand
+        // afterwards, or it lands in the total twice.
+        if (isIconRelevant() && (itemRenderer != null || besideCentredText)) {
             exclusions.push(icon);
         }
+
         var size = super.calcAutoSize(exclusions);
+
         if (itemRenderer != null && isIconRelevant()) {
             size.width += icon.width + horizontalSpacing;
         }
-        if (itemRenderer == null && isIconRelevant()) {
-            var label:Label = component.findComponent(Label, false);
-            var textAlign = cast(component, Button).textAlign;
-            if (label != null && textAlign == "center" && (iconPosition == "center-right" || iconPosition == "center-left")) {
-                if (icon.componentWidth != 0) size.width += icon.componentWidth  + horizontalSpacing;
-            }
+        if (besideCentredText && isIconRelevant() && icon.componentWidth != 0) {
+            size.width += icon.componentWidth + horizontalSpacing;
         }
         return size;
     }
     
     private inline function isIconRelevant() {
-        var icon:Image = component.findComponent("button-icon", false);
+        var icon:Component = component.findComponent("button-icon", false);
         return icon != null && icon.hidden == false && icon.componentWidth != 0 && icon.componentHeight !=0 && (iconPosition == "far-right" || iconPosition == "far-left" || iconPosition == "left" || iconPosition == "right" || iconPosition == "center-right" || iconPosition == "center-left");
     }
     
     private override function repositionChildren() {
         super.repositionChildren();
 
-        var label:Label = component.findComponent(Label, false);
+        var label:Label = component.findComponent("button-label", Label, false, "id");
         if (label != null && label.hidden == true) {
             label = null;
         }
-        var icon:Image = component.findComponent("button-icon", false);
+        var icon:Component = component.findComponent("button-icon", false);
         if (icon != null && icon.hidden) {
             icon = null;
         }
@@ -263,8 +268,8 @@ class ButtonLayout extends DefaultLayout {
     }
 
     private function calcLabelPositionTop():Float {
-        var label:Label = component.findComponent(Label, false);
-        var icon:Image = component.findComponent("button-icon", false);
+        var label:Label = component.findComponent("button-label", Label, false, "id");
+        var icon:Component = component.findComponent("button-icon", false);
         if (icon != null && icon.hidden) {
             icon = null;
         }
@@ -290,12 +295,12 @@ class ButtonLayout extends DefaultLayout {
     }
 
     private function calcIconPositionTop():Float {
-        var icon:Image = component.findComponent("button-icon", false);
+        var icon:Component = component.findComponent("button-icon", false);
         if (icon != null && icon.hidden) {
             icon = null;
         }
 
-        var label:Label = component.findComponent(Label, false);
+        var label:Label = component.findComponent("button-label", Label, false, "id");
 
         if (label == null && icon != null) {
             return Std.int((component.componentHeight / 2) - (icon.componentHeight / 2)) + marginTop(icon) - marginBottom(icon);
@@ -319,8 +324,8 @@ class ButtonLayout extends DefaultLayout {
     }
 
     private function calcLabelPositionLeft():Float {
-        var label:Label = component.findComponent(Label, false);
-        var icon:Image = component.findComponent("button-icon", false);
+        var label:Label = component.findComponent("button-label", Label, false, "id");
+        var icon:Component = component.findComponent("button-icon", false);
         if (icon != null && icon.hidden) {
             icon = null;
         }
@@ -389,12 +394,12 @@ class ButtonLayout extends DefaultLayout {
     }
 
     private function calcIconPositionLeft(labelLeft:Float = 0):Float {
-        var icon:Image = component.findComponent("button-icon", false);
+        var icon:Component = component.findComponent("button-icon", false);
         if (icon != null && icon.hidden) {
             icon = null;
         }
 
-        var label:Label = component.findComponent(Label, false);
+        var label:Label = component.findComponent("button-label", Label, false, "id");
         var textAlign = cast(component, Button).textAlign;
 
         if ((label == null && icon != null)) {
@@ -535,7 +540,7 @@ private class TextBehaviour extends DataBehaviour {
             data.text = _value.toString();
             itemRenderer.data = data;
         } else {
-            var label:Label = _component.findComponent(Label, false);
+            var label:Label = _component.findComponent("button-label", Label, false, "id");
             if (_value == null || _value.isNull) {
                 if (label != null) {
                     _component.removeClass("has-label", false);
@@ -557,33 +562,75 @@ private class TextBehaviour extends DataBehaviour {
 
 @:dox(hide) @:noCompletion
 private class IconBehaviour extends DataBehaviour {
-    private override function validateData() {
-        var icon:Image = _component.findComponent("button-icon", false);
+    // An icon font's glyph rather than an image: the font family, then the
+    // codepoint, as "lucide#e149". A glyph takes its size from the type scale
+    // and its colour from the style, which an image cannot, and it lets a
+    // button carry an icon in one font beside its text in another.
+    //
+    // It takes the same id as an image icon, because that is what the layout
+    // measures and what the styles reach.
+    private static var GLYPH:EReg = ~/^([^#\/]+)#([0-9a-fA-F]{2,6})$/;
 
-        if ((_value == null || _value.isNull || _value == "") && icon != null) {
+    private override function validateData() {
+        var existing = _component.findComponent("button-icon", false);
+        var image = (existing is Image) ? cast(existing, Image) : null;
+        var glyph = (existing is Label) ? cast(existing, Label) : null;
+
+        // Upstream falls through with no icon and an empty value, which is what
+        // gives an icon-less button its metrics.
+        if ((_value == null || _value.isNull || _value == "") && existing != null) {
             _component.customStyle.icon = null;
             _component.removeClass("has-icon", false);
-            _component.removeComponent(icon);
+            _component.removeComponent(existing);
             return;
         }
-        
-        if (icon == null) {
-            icon = new Image();
-            icon.addClass("icon");
+
+        if (GLYPH.match(_value)) {
+            if (image != null) {
+                _component.removeComponent(image);
+            }
+
+            if (glyph == null) {
+                glyph = new Label();
+                glyph.addClass("icon");
+                if (_component.hasClass(":hover")) {
+                    glyph.addClass(":hover");
+                }
+                if (_component.hasClass(":down")) {
+                    glyph.addClass(":down");
+                }
+                glyph.id = "button-icon";
+                _component.addClass("has-icon", false);
+                _component.addComponentAt(glyph, 0);
+            }
+
+            glyph.customStyle.fontName = GLYPH.matched(1);
+            glyph.text = String.fromCharCode(Std.parseInt("0x" + GLYPH.matched(2)));
+            _component.invalidateComponentStyle(true);
+            return;
+        }
+
+        if (glyph != null) {
+            _component.removeComponent(glyph);
+            image = null;
+        }
+
+        if (image == null) {
+            image = new Image();
+            image.addClass("icon");
             if (_component.hasClass(":hover")) {
-                icon.addClass(":hover");
+                image.addClass(":hover");
             }
             if (_component.hasClass(":down")) {
-                icon.addClass(":down");
+                image.addClass(":down");
             }
-            icon.id = "button-icon";
+            image.id = "button-icon";
             _component.addClass("has-icon", false);
-            _component.addComponentAt(icon, 0);
+            _component.addComponentAt(image, 0);
             _component.invalidateComponentStyle(true);
         }
 
-        //_component.customStyle.icon = _value;
-        icon.resource = _value;
+        image.resource = _value;
     }
 }
 
@@ -884,8 +931,11 @@ class ButtonBuilder extends CompositeBuilder {
             color, fontName, fontSize, cursor, textAlign, fontBold, fontUnderline, fontItalic
         ], false);
         haxe.ui.macros.ComponentMacros.cascadeStylesTo("button-icon", [cursor], false);
+        // Without fontName: an icon font's glyph keeps the family it was given,
+        // while colour and size still follow the button. The text label takes
+        // the font from the cascade above, by id.
         haxe.ui.macros.ComponentMacros.cascadeStylesToList(Label, [
-            color, fontName, fontSize, cursor, textAlign, fontBold, fontUnderline, fontItalic
+            color, fontSize, cursor, textAlign, fontBold, fontUnderline, fontItalic
         ]);
         
         if (style.icon != null) {
