@@ -43,6 +43,14 @@ class FocusManager extends FocusManagerImpl {
     }
 
     private function onScreenMouseDown(event:MouseEvent) {
+        // A focusable outside the Screen tree already took focus on its own mouse down.
+        for (root in _lastFocuses.keys()) {
+            var last = _lastFocuses.get(root);
+            if (last != null && last.focus == true && isPointerOver(cast last, event)) {
+                return;
+            }
+        }
+
         var list = Screen.instance.findComponentsUnderPoint(event.screenX, event.screenY);
         for (l in list) {
             if (isOfType(l, IFocusable)) {
@@ -131,13 +139,13 @@ class FocusManager extends FocusManagerImpl {
             _lastFocuses.set(root, value);
             applyFocus(cast value);
         } else {
-            var top = Screen.instance.topComponent;
-            if (top == null) {
-                return null;
-            }
-            if (_lastFocuses.exists(top)) {
-                _lastFocuses.get(top).focus = false;
-                unapplyFocus(cast _lastFocuses.get(top));
+            // Release every remembered focus, not only the Screen top's.
+            for (root in _lastFocuses.keys()) {
+                var last = _lastFocuses.get(root);
+                if (last != null && last.focus == true) {
+                    last.focus = false;
+                    unapplyFocus(cast last);
+                }
             }
         }
         return value;
